@@ -2,4 +2,4 @@
 
 ## Frank Y. Shih, Shouxian Cheng
 
-## Implemented in Python with [OpenCV](opencv.org)
+### Implemented in Python with [OpenCV](opencv.org) by Cole Webb
