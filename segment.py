@@ -100,8 +100,8 @@ class segment():
                 self.seededPixels[column - 1, row],                                                                     #
                 self.seededPixels[column + 1, row],                                                                     #
                 self.seededPixels[column, row + 1]]                                                                     #
-            minFoundDistance = 2
-            minFoundRegion = 0
+            minFoundDistance = 2                                                                                        #
+            minFoundRegion = 0                                                                                          #
             if (neighborhood[0] == neighborhood[1] == neighborhood[2] == neighborhood[3]) and neighborhood[0] != 0:     # if all four neighbors are in the same region, and that region isn't the background
                 self.seededPixels[column, row] = neighborhood[0]                                                        # set that pixel to that region
                 i = neighborhood[0]                                                                                     #
@@ -121,16 +121,86 @@ class segment():
             if not ((t['row'] == row - 1) & t['column'] == column).any():                                               # if the neighbors aren't already in the sorted list, add them
                 t[len(t)] = [row - 1, column, self.distances[column, row - 1]]                                          #
             if not ((t['row'] == row) & t['column'] == column - 1).any():                                               #
-                t[len(t)] = [row, column - 1, self.distances[column, row - 1]]                                          #
+                t[len(t)] = [row, column - 1, self.distances[column - 1, row]]                                          #
             if not ((t['row'] == row) & t['column'] == column + 1).any():                                               #
-                t[len(t)] = [row, column + 1, self.distances[column, row - 1]]                                          #
+                t[len(t)] = [row, column + 1, self.distances[column + 1, row]]                                          #
             if not ((t['row'] == row + 1) & t['column'] == column).any():                                               #
-                t[len(t)] = [row + 1, column, self.distances[column, row - 1]]                                          #
+                t[len(t)] = [row + 1, column, self.distances[column, row + 1]]                                          #
             t.sort_values('distance')                                                                                   #
 
 
     def regionMerging(self) -> None:
-        pass
+        colorSimilarityThreshold = 0.1                                                                                                              # set thresholds
+        sizeThreshold = (self.rows * self.columns)/150                                                                                              #
+        regionCount = np.amax(self.seededPixels) + 1                                                                                                #
+        regionSizes = []                                                                                                                            # setup for calculating region sizes and means
+        regionMeans = []                                                                                                                            #
+        similarityMergingComplete = False                                                                                                           # 
+        while not similarityMergingComplete:                                                                                                        # create dataframe of neighbors
+            neighbors = pd.DataFrame(columns=['neighbor1', 'neighbor2'])                                                                            # for each region that isn't the background
+            for i in range(1, regionCount):                                                                                                         # find size of region
+                regionSizes[i] = np.sum(self.seededPixels == i)                                                                                     # frind mean of region per color channel
+                regionMeans[i] = [np.mean(self.image[self.seededPixels == i, 0]),                                                                   #
+                                    np.mean(self.image[self.seededPixels == i, 1]),                                                                 #
+                                    np.mean(self.image[self.seededPixels == i, 2])]                                                                 #
+            for row in self.rows:                                                                                                                   # find neighbors of regions
+                for column in self.columns:                                                                                                         #
+                    currentRegion = self.seededPixels[column, row]                                                                                  #
+                    neighborRegions = [self.seededPixels[column, row - 1],                                                                          #
+                                        self.seededPixels[column - 1, row],                                                                         #
+                                        self.seededPixels[column + 1, row],                                                                         #
+                                        self.seededPixels[column, row + 1]]                                                                         #
+                    for i in range(0, 4):                                                                                                           # add neighbors to dataframe, if they don't already exist
+                        if not ((neighbors['neighbor1'] == currentRegion)                                                                           #
+                                    & (neighbors['neighbor2'] == neighborRegions[i])                                                                #
+                                    & (neighbors['neighbor2'] == currentRegion)                                                                     #
+                                    & (neighbors['neighbor1'] == neighborRegions[i])):                                                              #
+                            neighbors[len(neighbors)] = [currentRegion, neighborRegions[i]]                                                         # 
+            seededRegionMeans = []                                                                                                                  # recalculate means
+            for i in range(1, regionCount):                                                                                                         #
+                seededRegionMeans[i] = [np.mean(self.image[self.seededPixels == i, 0]),                                                             #
+                                        np.mean(self.image[self.seededPixels == i, 1]),                                                             #
+                                        np.mean(self.image[self.seeded == i, 2])]                                                                   #
+            neighbors['distances'] = [np.linalg.norm(seededRegionMeans[n['neighbor1']], seededRegionMeans[n['neighbor2']]) for n in neighbors]      # recalculate distances
+            neighbors.sort_values('distances')                                                                                                      # sort on distances
+            for i in neighbors:                                                                                                                     #
+                if i[2] < colorSimilarityThreshold:                                                                                                 # check distance condition
+                    self.seededPixels[self.seededPixels == i[0]] = i[1]                                                                             #
+            similarityMergingComplete = (neighbors['distance'] > 0.1).any()                                                                         #
+        cleanupComplete = False                                                                                                                     #
+        i = 1                                                                                                                                       # set up to clean up the regions
+        while not cleanupComplete:                                                                                                                  #
+            nextRegion = min(np.unique(self.seededPixels[self.seededPixels >= i]))                                                                  # find next region in order and set it to the next available label
+            self.seededPixels[self.seededPixels == nextRegion] = i                                                                                  # 
+            i += 1                                                                                                                                  #
+            cleanupComplete = (np.amax(self.seededPixels) == i)                                                                                     # check if complete
+        sizeMergingComplete = False
+        while not sizeMergingComplete:
+            regionCount = np.amax(self.seededPixels)
+            regionSizes = []
+            neighbors = pd.DataFrame(columns=['neighbor1', 'neighbor2'])
+            for row in self.rows:
+                for column in self.columns:
+                    currentRegion = self.seededPixels[column, row]
+                    neighborRegions = [self.seededPixels[column, row - 1],
+                                        self.seededPixels[column - 1, row],
+                                        self.seededPixels[column + 1, row],
+                                        self.seededPixels[column, row + 1]]
+                    for i in range(0, 4):
+                        if not ((neighbors['neighbor1'] == currentRegion) 
+                                    & (neighbors['neighbor2'] == neighborRegions[i]) 
+                                    & (neighbors['neighbor2'] == currentRegion) 
+                                    & (neighbors['neighbor1'] == neighborRegions[i])):
+                            neighbors[len(neighbors)] = [currentRegion, neighborRegions[i]]
+            for i in range(1, regionCount):
+                regionSizes[i] = (self.seededPixels == i).sum()
+                if regionSizes[i] < sizeThreshold:
+                    regionNeighbors = neighbors['neighbor1'] == i | neighbors['neighbor2'] == i
+                    for j in regionNeighbors:
+
+        # TODO: merge any regions that are under the size threshold
+
+            
 
     def main(self) -> None:
         self.imageConvert()     # Step 1: Complete
