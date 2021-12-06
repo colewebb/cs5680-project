@@ -19,12 +19,31 @@ class segment():
         self.distances = np.zeros((self.columns, self.rows))    # initialize euclidean distances array
         self.similarities = np.zeros((self.columns, self.rows)) # initialize similarities array
         self.seededPixels = np.zeros((self.columns, self.rows)) # initialize seed pixels array
+        self.regions = np.zeros((self.columns, self.rows))
+        self.regionCount = 0
+        self.regionStats = []
 
     def imageConvert(self) -> None:
         self.image = cv.cvtColor(self.image, cv.COLOR_BGR2YCR_CB)
 
     def inverseImageConvert(self) -> None:
         self.image = cv.cvtColor(self.image, cv.COLOR_YCR_CB2BGR)
+
+    def recalculateRegionStats(self) -> None:
+        for i in range(1, self.regionCount):
+            region = self.image[self.regions == i]
+            size = np.count_nonzero(region)
+            yMean = np.mean(region[region != 0][0])
+            cbMean = np.mean(region[region != 0][1])
+            crMean = np.mean(region[region != 0][2])
+            self.regionStats[i] = [size, yMean, cbMean, crMean]
+
+    def mergeRegions(self, region1, region2) -> None:
+        self.regionCount = self.regionCount - 1
+        self.regions[self.regions == region2] = region1
+        for i in range(region2, self.regionCount):
+            self.regionStats[i] = self.regionStats[i + 1]
+        self.recalculateRegionStats()
     
     # Calculates the standard deviation of all three channels in a 3x3 area
     # Takes the location of the center of the area of interest
@@ -74,23 +93,23 @@ class segment():
     # Takes no inputs
     # Returns None, just tweaks class variables
     def regionGrowing(self) -> None:
-        seedCount, self.seededPixels, stats, centroids = cv.connectedComponentsWithStats(self.seededPixels, 8)          # label all seeds (using connected components)
+        seedCount, self.regions, stats, centroids = cv.connectedComponentsWithStats(self.seededPixels.astype(np.uint8), 8)               # label all seeds (using connected components)
         self.distances = self.distances/255                                                                             # return distances to range 0..1
-        kernel = [[0, 1, 0],                                                                                            # create kernel for hit operation
+        kernel = np.asarray([[0, 1, 0],                                                                                            # create kernel for hit operation
                     [1, 0, 1],                                                                                          #
-                    [0, 1, 0]]                                                                                          #
+                    [0, 1, 0]]).astype(np.uint8)                                                                                          #
         seedNeighbors = np.logical_and(cv.dilate(self.seededPixels, kernel), self.seededPixels)                         # find neighbors of the seeds
         t = pd.DataFrame(columns=['row', 'column', 'distance'])                                                         # stuff all of the neighbors and their distances into a pandas DataFrame
         for row in range(0, self.rows):                                                                                 #
             for column in range(0, self.columns):                                                                       #
                 if seedNeighbors[column, row] != 0:                                                                     #
-                    t.iloc[len(t)] = [row, column, self.distances[column, row]]                                         #
+                    t.loc[len(t)] = [row, column, self.distances[column, row]]                                         #
         t.sort_values('distance')                                                                                       # sort the dataframe on distances
-        seededRegionMeans = []                                                                                          # initialize array for means of seeds
+        seededRegionMeans = [[0, 0, 0]]                                                                                          # initialize array for means of seeds
         for i in range(1, seedCount):                                                                                   # calculate means of each seeded region
-            seededRegionMeans[i] = [np.mean(self.image[self.seededPixels == i, 0]),                                     #
+            seededRegionMeans.append([np.mean(self.image[self.seededPixels == i, 0]),                                     #
                 np.mean(self.image[self.seededPixels == i, 1]),                                                         #
-                np.mean(self.image[self.seeded == i, 2])]                                                               #
+                np.mean(self.image[self.seededPixels == i, 2])])                                                         #
         while t.empty is False:                                                                                         # while the list of seed neighbors is not empty
             p = t[0]                                                                                                    # grab least distance member
             t = t[1:, :]                                                                                                # delete least distance member from dataframe
@@ -197,7 +216,7 @@ class segment():
                 if regionSizes[i] < sizeThreshold:
                     regionNeighbors = neighbors['neighbor1'] == i | neighbors['neighbor2'] == i
                     for j in regionNeighbors:
-
+                        pass
         # TODO: merge any regions that are under the size threshold
 
             
@@ -209,7 +228,8 @@ class segment():
         self.regionMerging()    # Step 4: Planned
 
 if __name__ == "__main__":
-    imagePath = input(" image path >>> ")
+    # imagePath = input(" image path >>> ")
+    imagePath = "./pictures/img.png"
     processor = segment(imagePath)
     if processor.image is None:
         print("This file doesn't exist. Exiting...")
