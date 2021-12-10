@@ -4,4 +4,7 @@
 *.jpeg
 *.tiff
 *.tif
+*.asv
 ./pictures
+pictures/P1_Color Seeded region growing.pdf
+pictures/Presentation.pptx

@@ -1,6 +1,6 @@
 function distance = relativeEuclideanDistance(image, column, row)
     center = image(column, row);
-    neighbors = [image(column - 1:column + 1, row - 1), 
+    neighbors = [image(column - 1:column + 1, row - 1),
         image(column - 1, row),
         image(column + 1, row),
         image(column - 1:column + 1, row + 1)];

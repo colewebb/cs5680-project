@@ -1,7 +1,7 @@
 % Automatic seeded region growing for color image segmentation
 % Frank Y. Shih, Shouxian Cheng
 % doi:10.1016/j.mavis.2005.05.015
-% Implemented in Python by Cole Webb
+% Implemented in MATLAB by Cole Webb
 % ---- Begin -----
 im = imread("./pictures/img.png");
 yIm = rgb2ycbcr(im);
@@ -27,9 +27,9 @@ for column = 2:columns - 1
         distances(column, row) = relativeEuclideanDistance(yIm, column, row);
     end
 end
-similarities = imbinarize(similarities, 'global');
-distances = imbinarize(distances, 0.05);
-seededPixels = similarities & distances;
+thresholdedSimilarities = imbinarize(similarities, 'global');
+thresholdedDistances = imbinarize(distances, 0.05);
+seededPixels = thresholdedSimilarities & thresholdedDistances;
 % ----- Component 2, complete -----
 subplot(1,3,1);
 imshow(similarities);
@@ -44,5 +44,44 @@ disp("Press any key to continue...")
 pause;
 close all;
 % ----- Displaying Component 2, complete -----
-
-
+se = strel('diamond', 1);
+regionNeighbors = imdilate(seededPixels, se) - seededPixels;
+[regions, regionCount] = bwlabel(seededPixels, 8);
+regionStats = computeRegionStats(regions, yIm);
+% imshow(label2rgb(regions));
+% pause;
+rows = size(im, 1);
+columns = size(im, 2);
+neighborTable = [];
+for row = 2:rows - 1
+    for column = 2:columns - 1
+        neighbors = findNeighbors(regions, column, row);
+        if min(neighbors) > 0
+            neighbors = neighbors(neighbors > 0);
+            neighborDistances = [];
+            for neighbor = 1:size(regionStats, 1)
+                neighborStats = regionStats(neighbor, :);
+                pixelValues = double(yIm(row, column, :));
+                numerator = sqrt((pixelValues(1) - neighborStats.yMean)^2 + (pixelValues(2) - neighborStats.cbMean)^2 + (pixelValues(3) - neighborStats.crMean)^2);
+                denominator = sqrt(pixelValues(1) ^ 2 + pixelValues(2)^2 + pixelValues(3)^2);
+                neighborDistances(neighbor, :) = [neighbor, numerator/denominator];
+            end
+            neighborTable(end + 1) = [row, column, min(neighborDistances)];
+        end
+    end
+end
+neighborTable = sortrows(neighborTable, 3);
+pause;
+while size(neighborTable) > 0
+    p = neighborTable(1, :);
+    neighborTable = neighborTable(2, :);
+    row = p(1);
+    column = p(2);
+    neighbors = [seededPixels(column, row - 1),
+        seededPixels(column - 1, row),
+        seededPixels(column + 1, row),
+        seededPixels(column, row + 1)];
+    if (neighbors(1) == neighbors(2) == neighbors(3) == neighbors(4)) && neighbors(1) ~= 0
+        seededPixels(column, row) = neighbors(1);
+    end
+end
