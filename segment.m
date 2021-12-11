@@ -30,6 +30,7 @@
 % ~ Cole
 %
 % ---- Begin -----
+% Read the image, convert it to YCbCr
 im = imread("./pictures/img.png");
 yIm = rgb2ycbcr(im);
 % ----- Component 1, complete -----
@@ -43,6 +44,7 @@ disp("Press any key to continue...")
 pause;
 close all;
 % ----- Displaying Component 1, complete -----
+% Generate information about individual pixels in the image
 columns = size(yIm, 1);
 rows = size(yIm, 2);
 stdDevs = stdfilt(yIm(:, :, 1)) + stdfilt(yIm(:, :, 2)) + stdfilt(yIm(:, :, 3));
@@ -54,8 +56,10 @@ for column = 2:columns - 1
         distances(column, row) = relativeEuclideanDistance(yIm, column, row);
     end
 end
+% Threshold that information
 thresholdedSimilarities = imbinarize(similarities, 'global');
 thresholdedDistances = imbinarize(distances, 0.05);
+% And elementwise AND the information matrices to get our seeded pixels
 seededPixels = thresholdedSimilarities & thresholdedDistances;
 % ----- Component 2, complete -----
 subplot(1,3,1);
@@ -123,11 +127,19 @@ while size(neighborTable) > 0
     end
 end
 % ----- Component 3, complete -----
+% find out how many regions we are working with
 regionCount = max(max(seededPixels));
+% generate regionCount x regionCount matrix to hold neighbor connections
+% using computeNeighbors function (which I wrote, because MATLAB's concept
+% of regions is a little bit lost
 neighbors = computeNeighbors(seededPixels);
+% compute some data about the regions
 regionStats = computeRegionStats(seededPixels, yIm);
+% set thresholds
 sizeThreshold = (rows * columns)/150;
 distanceThreshold = 0.1;
+% check neighboring regions against the thresholds above, and merge if
+% under either threshold to nearest neighbor
 for i = 1:regionCount
     regionStats = regionStats(i, :);
     regionNeighbors = find(regions == 1);
