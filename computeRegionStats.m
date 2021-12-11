@@ -1,4 +1,7 @@
 function stats = computeRegionStats(regions, im)
+    % takes a regions matrix and an image matrix of the same size
+    % returns stats table of regions with columns:
+    % [region, size, yMean, cbMean, crMean]
     % separate channels
     yChannel = im(:, :, 1);
     cbChannel = im(:, :, 2);

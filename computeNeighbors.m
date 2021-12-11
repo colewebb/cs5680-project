@@ -1,3 +1,7 @@
+% Takes a seeded pixel set, regions
+% Returns a regionCount x regionCount matrix designating neighbors
+% (i.e., if region #3 and region #7 neighbor each other, 
+% neighbors(3, 7) = 1)
 function neighbors = computeNeighbors(regions)
     regionCount = max(max(regions));
     neighbors = zeros(regionCount);
